@@ -6,7 +6,8 @@ it does not include a service-role key or mock school data.
 
 ## Open and run
 
-1. Open the `android/` directory in Android Studio and allow Gradle sync.
+1. Open the `android/` directory in Android Studio and allow Gradle sync. The
+   project includes the Gradle wrapper.
 2. Add the public Supabase project configuration to `android/local.properties`
    (this file is ignored by Git):
 
@@ -32,3 +33,14 @@ Guru accounts can use teacher check-in/out, teaching schedules, attendance
 rosters, and leave requests. Wali Kelas accounts can view their class, class
 attendance/recap, and submit leave; accounts with both roles can use both
 workflows. Admin-only accounts are rejected from the Android client.
+
+## Download a debug APK
+
+The `Build AbsensiMax Android` GitHub Actions workflow creates a debug APK on
+Android-source changes and can also be started manually from the repository's
+**Actions** tab. Download the `AbsensiMax-Android-debug` artifact from a
+successful run.
+
+For a local build, run `node scripts/write-android-local-properties.mjs` from
+the repository root to write the public Supabase settings into the ignored
+Android properties file, then build the `app` debug variant in Android Studio.

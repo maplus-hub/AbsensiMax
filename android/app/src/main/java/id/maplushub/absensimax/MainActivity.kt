@@ -131,6 +131,14 @@ private fun AbsensiMaxApp() {
             ?: kotlin.error("Data beranda tidak valid")
     }
 
+    suspend fun loadStudentsForSelection() {
+        students = if (selectedClassId.isBlank()) {
+            emptyList()
+        } else {
+            api.invoke("listStudents", JSONObject().put("classId", selectedClassId)).asObjects()
+        }
+    }
+
     suspend fun loadClassData() {
         classes = api.invoke("listClasses").asObjects()
         schedules = api.invoke("listSchedules").asObjects()
@@ -148,14 +156,6 @@ private fun AbsensiMaxApp() {
         ) {
             selectedScheduleId = ""
             roster = emptyList()
-        }
-    }
-
-    suspend fun loadStudentsForSelection() {
-        students = if (selectedClassId.isBlank()) {
-            emptyList()
-        } else {
-            api.invoke("listStudents", JSONObject().put("classId", selectedClassId)).asObjects()
         }
     }
 
