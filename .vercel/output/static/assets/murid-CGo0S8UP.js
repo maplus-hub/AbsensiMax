@@ -1,0 +1,1 @@
+import{a as e}from"./useNavigate-BVBKrbSk.js";import{t}from"./guard-24dpXBHZ.js";import{t as n}from"./murid-absen-CTKBOPVD.js";var r=e();function i(){return(0,r.jsx)(t,{role:`wali`,children:(0,r.jsx)(n,{})})}export{i as component};

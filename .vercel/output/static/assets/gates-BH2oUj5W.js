@@ -1,0 +1,1 @@
+import{t as e}from"./react-DB-4Zxce.js";import{a as t,t as n}from"./useNavigate-BVBKrbSk.js";e();var r=t(),i=`/login`;function a({to:e=i}){return(0,r.jsx)(n,{to:e})}export{a as t};
