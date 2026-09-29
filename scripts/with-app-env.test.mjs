@@ -59,8 +59,11 @@ test("an explicit process-env override wins over the file", () => {
   assert.equal(merged.PATH, "/usr/bin");
 });
 
-test("this app ships auth on", () => {
-  assert.deepEqual(readAppEnv(projectRoot()), { VITE_AUTH_ENABLED: "true" });
+test("this app ships public Supabase Auth settings", () => {
+  const env = readAppEnv(projectRoot());
+  assert.equal(env.VITE_SUPABASE_URL, "https://kzgoihkabdtkiawrfjtp.supabase.co");
+  assert.ok(env.VITE_SUPABASE_ANON_KEY);
+  assert.equal(env.VITE_AUTH_ENABLED, "true");
 });
 
 test("vite loadEnv resolves the wrapped value", () => {

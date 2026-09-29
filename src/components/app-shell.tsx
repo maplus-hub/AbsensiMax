@@ -10,9 +10,8 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import { type ReactNode, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useState } from "react";
 import { signOut } from "@/lib/auth/client";
-import { hasGateSessionMarker } from "@/lib/auth/gate-session-marker";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useSchool } from "@/lib/school/context";
 import { homeForRole } from "@/lib/school/role";
@@ -52,19 +51,12 @@ function isActive(pathname: string, to: string) {
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
-const subscribeToNothing = () => () => {};
-
 export function AppShell({ children }: { children: ReactNode }) {
   const { profile, role, setRole } = useSchool();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const items = navFor(role);
   const user = useCurrentUser();
   const [signingOut, setSigningOut] = useState(false);
-  const gateSession = useSyncExternalStore(
-    subscribeToNothing,
-    hasGateSessionMarker,
-    () => false,
-  );
 
   return (
     <div className="min-h-dvh bg-background text-ink">
@@ -98,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="hidden max-w-[9rem] truncate text-sm font-medium sm:block">
               {profile.staff.name}
             </span>
-            {user && !gateSession && (
+            {user && (
               <button
                 type="button"
                 disabled={signingOut}

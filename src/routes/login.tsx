@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
+import { authClient, authEnabled } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { BrandWord, LogoMark } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (isPending) {
@@ -35,13 +36,28 @@ function Login() {
   const submit = async () => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       if (mode === "up") {
-        const res = await authClient.signUp.email({ name, email, password, callbackURL: "/" });
-        if (res.error) throw new Error(res.error.message);
+        const { data, error: signUpError } = await authClient.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { name },
+            emailRedirectTo: `${window.location.origin}/`,
+          },
+        });
+        if (signUpError) throw signUpError;
+        if (!data.session) {
+          setNotice("Periksa email Anda untuk mengonfirmasi akun sebelum masuk.");
+          return;
+        }
       } else {
-        const res = await authClient.signIn.email({ email, password, callbackURL: "/" });
-        if (res.error) throw new Error(res.error.message);
+        const { error: signInError } = await authClient.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
       }
       window.location.href = "/";
     } catch (e) {
@@ -80,28 +96,11 @@ function Login() {
             {mode === "in" ? "Gunakan akun yang didaftarkan sekolah." : "Daftar dengan email yang dicatat admin."}
           </p>
 
-          {authEnabled ? (
-            <div className="mt-5 space-y-2">
-              {GROK_PROVIDERS.map((p) => (
-                <Button
-                  key={p.providerId}
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => void signIn(p.providerId, { callbackURL: "/" })}
-                >
-                  Lanjut dengan {p.label}
-                </Button>
-              ))}
-            </div>
-          ) : (
+          {!authEnabled && (
             <p className="mt-4 text-sm text-muted">Masuk dinonaktifkan.</p>
           )}
 
-          <div className="my-5 flex items-center gap-3 text-xs tracking-wide text-subtle uppercase">
-            <span className="h-px flex-1 bg-border" />
-            atau email
-            <span className="h-px flex-1 bg-border" />
-          </div>
+          <p className="mt-5 text-xs tracking-wide text-subtle uppercase">Email dan kata sandi</p>
 
           <form
             className="space-y-3"
@@ -129,6 +128,7 @@ function Login() {
               />
             </Field>
             {error && <p className="text-sm text-alpha">{error}</p>}
+            {notice && <p className="text-sm text-primary">{notice}</p>}
             <Button type="submit" className="w-full" disabled={busy || !authEnabled}>
               {busy ? "Memproses…" : mode === "in" ? "Masuk" : "Daftar"}
             </Button>

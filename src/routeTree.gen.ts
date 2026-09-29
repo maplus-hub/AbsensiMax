@@ -24,7 +24,6 @@ import { Route as AppWaliIndexRouteImport } from './routes/_app/wali/index'
 import { Route as AppWaliIzinRouteImport } from './routes/_app/wali/izin'
 import { Route as AppWaliMuridRouteImport } from './routes/_app/wali/murid'
 import { Route as AppWaliRekapRouteImport } from './routes/_app/wali/rekap'
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -100,11 +99,6 @@ const AppWaliRekapRoute = AppWaliRekapRouteImport.update({
   path: '/wali/rekap',
   getParentRoute: () => AppRoute,
 } as any)
-const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-  id: '/api/auth/$',
-  path: '/api/auth/$',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -118,7 +112,6 @@ export interface FileRoutesByFullPath {
   '/wali/izin': typeof AppWaliIzinRoute
   '/wali/murid': typeof AppWaliMuridRoute
   '/wali/rekap': typeof AppWaliRekapRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin/': typeof AppAdminIndexRoute
   '/guru/': typeof AppGuruIndexRoute
   '/wali/': typeof AppWaliIndexRoute
@@ -135,7 +128,6 @@ export interface FileRoutesByTo {
   '/wali/izin': typeof AppWaliIzinRoute
   '/wali/murid': typeof AppWaliMuridRoute
   '/wali/rekap': typeof AppWaliRekapRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
   '/admin': typeof AppAdminIndexRoute
   '/guru': typeof AppGuruIndexRoute
   '/wali': typeof AppWaliIndexRoute
@@ -154,7 +146,6 @@ export interface FileRoutesById {
   '/_app/wali/izin': typeof AppWaliIzinRoute
   '/_app/wali/murid': typeof AppWaliMuridRoute
   '/_app/wali/rekap': typeof AppWaliRekapRoute
-  '/api/auth/$': typeof ApiAuthSplatRoute
   '/_app/admin/': typeof AppAdminIndexRoute
   '/_app/guru/': typeof AppGuruIndexRoute
   '/_app/wali/': typeof AppWaliIndexRoute
@@ -173,7 +164,6 @@ export interface FileRouteTypes {
     | '/wali/izin'
     | '/wali/murid'
     | '/wali/rekap'
-    | '/api/auth/$'
     | '/admin/'
     | '/guru/'
     | '/wali/'
@@ -190,7 +180,6 @@ export interface FileRouteTypes {
     | '/wali/izin'
     | '/wali/murid'
     | '/wali/rekap'
-    | '/api/auth/$'
     | '/admin'
     | '/guru'
     | '/wali'
@@ -208,7 +197,6 @@ export interface FileRouteTypes {
     | '/_app/wali/izin'
     | '/_app/wali/murid'
     | '/_app/wali/rekap'
-    | '/api/auth/$'
     | '/_app/admin/'
     | '/_app/guru/'
     | '/_app/wali/'
@@ -218,7 +206,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
-  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -328,13 +315,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWaliRekapRouteImport
       parentRoute: typeof AppRoute
     }
-    '/api/auth/$': {
-      id: '/api/auth/$'
-      path: '/api/auth/$'
-      fullPath: '/api/auth/$'
-      preLoaderRoute: typeof ApiAuthSplatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -374,7 +354,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
-  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

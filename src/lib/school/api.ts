@@ -81,7 +81,7 @@ function dateStr(v: unknown): string {
 async function authUser(userId: string): Promise<AuthUserRow> {
   const sql = await getSql();
   const rows = await sql<AuthUserRow>`
-    select id, name, email from "user" where id = ${userId} limit 1
+    select id, name, email from app_users where id = ${userId} limit 1
   `;
   const u = rows[0];
   if (!u) return { id: userId, name: "Pengguna", email: "" };

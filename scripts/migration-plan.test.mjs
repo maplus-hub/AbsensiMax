@@ -60,7 +60,7 @@ test("the app's enabled auth schema and school schema are applied", () => {
   const migrationsDir = join(projectRoot(), "migrations");
   assert.deepEqual(
     pendingMigrations(readdirSync(migrationsDir), []).map(({ name }) => name),
-    ["0001_auth.sql", "0002_school.sql"],
+    ["0001_auth.sql", "0002_school.sql", "0003_supabase_auth.sql"],
   );
   assert.ok(readdirSync(join(migrationsDir, "auth")).includes("0001_auth.sql"));
 });
