@@ -1,7 +1,14 @@
-import { Outlet, createFileRoute, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  Navigate,
+  Outlet,
+  createFileRoute,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BrandWord, LogoMark } from "@/components/logo";
 import { AppShell } from "@/components/app-shell";
+import { signOut } from "@/lib/auth/client";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { bootstrapSession } from "@/lib/school/api";
@@ -31,8 +38,7 @@ function AppLayout() {
             : pathname.startsWith("/guru")
               ? "guru"
               : null;
-        const next =
-          fromPath && p.roles.includes(fromPath) ? fromPath : readStoredRole(p);
+        const next = fromPath && p.roles.includes(fromPath) ? fromPath : readStoredRole(p);
         setRoleState(next);
         storeRole(next);
       })
@@ -71,6 +77,27 @@ function AppLayout() {
     );
   }
   if (!ctx) return <BootScreen label="Menyiapkan sekolah" />;
+  if (import.meta.env.VITE_STATIC_SITE === "true" && !ctx.profile.staff.isAdmin) {
+    return (
+      <main className="grid min-h-dvh place-items-center bg-background px-6 text-center">
+        <div className="max-w-sm">
+          <p className="text-sm text-muted">
+            Akun Guru dan Wali Kelas menggunakan aplikasi Android AbsensiMax.
+          </p>
+          <button
+            type="button"
+            className="mt-5 text-sm font-medium text-primary underline"
+            onClick={() => void signOut("/login")}
+          >
+            Keluar
+          </button>
+        </div>
+      </main>
+    );
+  }
+  if (import.meta.env.VITE_STATIC_SITE === "true" && !pathname.startsWith("/admin")) {
+    return <Navigate to="/admin" />;
+  }
 
   return (
     <SchoolContext.Provider value={ctx}>

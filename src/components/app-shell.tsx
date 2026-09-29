@@ -70,7 +70,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {profile.school.name}
           </p>
           <div className="ml-auto flex items-center gap-2">
-            {profile.roles.length > 1 && (
+            {import.meta.env.VITE_STATIC_SITE !== "true" && profile.roles.length > 1 && (
               <select
                 aria-label="Pilih peran"
                 value={role}
@@ -205,7 +205,9 @@ export function PageHeader({
     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
         {kicker && (
-          <p className="mb-1 text-xs font-medium tracking-[0.14em] text-muted uppercase">{kicker}</p>
+          <p className="mb-1 text-xs font-medium tracking-[0.14em] text-muted uppercase">
+            {kicker}
+          </p>
         )}
         <h1 className="font-display text-3xl font-medium text-ink">{title}</h1>
         {desc && <p className="mt-1 max-w-xl text-sm text-muted">{desc}</p>}

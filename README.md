@@ -1,24 +1,38 @@
 # AbsensiMax
 
-AbsensiMax uses Supabase Auth for email/password accounts and PostgreSQL for
-school and attendance data. The school API verifies each Supabase access token
-on the server before loading or changing a user's school profile.
+Admin memakai web di GitHub Pages. Guru dan Wali Kelas memakai aplikasi
+Android. Login dan data keduanya tersimpan di proyek Supabase yang sama.
 
-## Supabase configuration
+## Menyiapkan layanan
 
-- `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are public client settings.
-  The local app-builder preview reads them from `.grok/app-env.json`.
-- Set `DATABASE_URL` in the deployment environment to the Supabase PostgreSQL
-  pooler connection string. Keep it private; the application uses it only on
-  the server to run migrations and execute authorized queries.
-- Configure the Supabase Auth site URL and allowed redirect URLs for the
-  deployed app origin. Email confirmation and SMTP delivery are controlled in
-  the Supabase project settings.
+Sebelum aplikasi dapat dipakai:
 
-`npm run build` applies the SQL migrations to `DATABASE_URL`. The migration
-enables row-level security and revokes direct table access from the Supabase
-`anon` and `authenticated` API roles; app data is accessed through the
-authenticated server functions.
+1. Di Supabase **SQL Editor**, jalankan file migrasi secara berurutan:
+   `migrations/0001_auth.sql`, `migrations/0002_school.sql`, lalu
+   `migrations/0003_supabase_auth.sql`. Data sekolah lama tidak disalin.
+2. Di GitHub repo, buka **Settings → Secrets and variables → Actions** dan
+   tambahkan dua *repository secrets*:
+   - `SUPABASE_ACCESS_TOKEN` — token pribadi dari Supabase.
+   - `SUPABASE_PROJECT_REF` — kode proyek di alamat URL Supabase.
+3. Jalankan workflow **Deploy Supabase school API** dari tab **Actions**.
+   Kunci service-role tetap berada di Supabase; jangan masukkan kunci itu ke
+   aplikasi atau kirim lewat chat.
+4. Di Supabase **Authentication → URL Configuration**, izinkan alamat
+   `https://maplus-hub.github.io/AbsensiMax/` sebagai URL situs dan redirect.
+   Pastikan konfirmasi email dan pengiriman email sudah dikonfigurasi.
+5. Di GitHub **Settings → Pages**, pilih **GitHub Actions** sebagai sumber
+   publikasi. Workflow akan menerbitkan web Admin saat ada perubahan di `main`.
 
-Accounts must be created again in Supabase Auth. Existing school and attendance
-records are not copied; the Supabase database starts with a fresh schema.
+Alamat web Admin:
+`https://maplus-hub.github.io/AbsensiMax/`
+
+Kunci anon Supabase di `.grok/app-env.json` memang dipakai di browser dan
+bukan password database maupun kunci service-role.
+
+## Akun dan aplikasi Android
+
+Akun Admin pertama dibuat dari halaman web. Admin menambahkan email Guru/Wali
+di menu akun; Guru/Wali lalu mendaftar di aplikasi Android dengan email yang
+sama. Akun dari sistem login lama harus mendaftar ulang. Buka folder `android/`
+di Android Studio untuk menjalankan aplikasi Guru/Wali. Konfigurasi Supabase
+lokal Android disimpan di `android/local.properties` dan tidak masuk Git.

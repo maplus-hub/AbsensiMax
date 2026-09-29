@@ -9,6 +9,7 @@ import { Field, Input } from "@/components/ui/input";
 export const Route = createFileRoute("/login")({ component: Login });
 
 function Login() {
+  const adminSite = import.meta.env.VITE_STATIC_SITE === "true";
   const { user, isPending } = useCurrentUserState();
   const [mode, setMode] = useState<"in" | "up">("in");
   const [name, setName] = useState("");
@@ -44,7 +45,7 @@ function Login() {
           password,
           options: {
             data: { name },
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
           },
         });
         if (signUpError) throw signUpError;
@@ -80,25 +81,38 @@ function Login() {
             Absensi guru dan murid, rapi setiap jam pelajaran.
           </h1>
           <p className="mt-4 max-w-md text-muted">
-            Masuk-pulang, izin dan cuti, absensi kelas, plus rekap yang siap dicetak. Admin mengatur
-            sekolah; guru dan wali kelas bekerja dari genggaman.
+            {adminSite
+              ? "Atur akun guru, data sekolah, jadwal, persetujuan izin, dan rekap kehadiran."
+              : "Masuk-pulang, izin dan cuti, absensi kelas, plus rekap yang siap dicetak. Admin mengatur sekolah; guru dan wali kelas bekerja dari genggaman."}
           </p>
           <ul className="mt-8 space-y-2 text-sm text-ink">
-            <li className="rounded-[16px] bg-surface px-4 py-3 shadow-card">Admin — akun, jadwal, persetujuan, rekap guru</li>
-            <li className="rounded-[16px] bg-surface px-4 py-3 shadow-card">Guru — absen masuk/pulang dan murid di jam mengajar</li>
-            <li className="rounded-[16px] bg-surface px-4 py-3 shadow-card">Wali kelas — rekap seluruh pelajaran di kelasnya</li>
+            <li className="rounded-[16px] bg-surface px-4 py-3 shadow-card">
+              Admin — akun, jadwal, persetujuan, rekap guru
+            </li>
+            {!adminSite && (
+              <>
+                <li className="rounded-[16px] bg-surface px-4 py-3 shadow-card">
+                  Guru — absen masuk/pulang dan murid di jam mengajar
+                </li>
+                <li className="rounded-[16px] bg-surface px-4 py-3 shadow-card">
+                  Wali kelas — rekap seluruh pelajaran di kelasnya
+                </li>
+              </>
+            )}
           </ul>
         </section>
 
         <section className="rounded-[28px] bg-surface p-6 shadow-card sm:p-8">
           <h2 className="font-display text-2xl font-medium">Masuk AbsensiMax</h2>
           <p className="mt-1 text-sm text-muted">
-            {mode === "in" ? "Gunakan akun yang didaftarkan sekolah." : "Daftar dengan email yang dicatat admin."}
+            {mode === "in"
+              ? "Gunakan akun admin sekolah."
+              : adminSite
+                ? "Buat akun admin untuk mengelola sekolah."
+                : "Daftar dengan email yang dicatat admin."}
           </p>
 
-          {!authEnabled && (
-            <p className="mt-4 text-sm text-muted">Masuk dinonaktifkan.</p>
-          )}
+          {!authEnabled && <p className="mt-4 text-sm text-muted">Masuk dinonaktifkan.</p>}
 
           <p className="mt-5 text-xs tracking-wide text-subtle uppercase">Email dan kata sandi</p>
 
@@ -115,7 +129,13 @@ function Login() {
               </Field>
             )}
             <Field label="Email">
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </Field>
             <Field label="Kata sandi">
               <Input

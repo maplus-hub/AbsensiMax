@@ -7,8 +7,8 @@ create table if not exists app_users (
   updated_at timestamptz not null default now()
 );
 
--- The application accesses these tables through its authenticated server
--- functions and a private PostgreSQL connection, never through the anon API.
+-- Application queries run in the authenticated Supabase Edge Function. Clients
+-- do not receive direct table grants or a PostgreSQL connection string.
 alter table schools enable row level security;
 alter table staff enable row level security;
 alter table classes enable row level security;

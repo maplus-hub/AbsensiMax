@@ -17,7 +17,13 @@ const dist = join(root, "node_modules", "@electric-sql", "pglite", "dist");
 const runtimeFiles = ["pglite.data", "pglite.wasm", "initdb.wasm"];
 
 try {
-  await access(library);
+  try {
+    await access(library);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    console.log("[copy-pglite-data] PGlite is not bundled; no runtime assets needed.");
+    process.exit(0);
+  }
   const libDir = dirname(library);
   await mkdir(libDir, { recursive: true });
   await Promise.all(

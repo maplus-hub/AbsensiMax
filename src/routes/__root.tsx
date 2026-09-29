@@ -31,19 +31,32 @@ export const Route = createRootRoute({
       },
     ],
   }),
-  component: () => (
-    <html lang="id" suppressHydrationWarning>
-      <head>
-        <HeadContent />
-      </head>
-      <body className="antialiased">
-        <PreviewHostBridge />
-        <AuthProvider>
-          <Outlet />
-          <Toaster position="top-center" richColors closeButton />
-        </AuthProvider>
-        <Scripts />
-      </body>
-    </html>
-  ),
+  component: () => {
+    if (import.meta.env.VITE_STATIC_SITE === "true") {
+      return (
+        <div className="antialiased">
+          <PreviewHostBridge />
+          <AuthProvider>
+            <Outlet />
+            <Toaster position="top-center" richColors closeButton />
+          </AuthProvider>
+        </div>
+      );
+    }
+    return (
+      <html lang="id" suppressHydrationWarning>
+        <head>
+          <HeadContent />
+        </head>
+        <body className="antialiased">
+          <PreviewHostBridge />
+          <AuthProvider>
+            <Outlet />
+            <Toaster position="top-center" richColors closeButton />
+          </AuthProvider>
+          <Scripts />
+        </body>
+      </html>
+    );
+  },
 });
