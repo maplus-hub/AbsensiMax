@@ -7,7 +7,10 @@ it does not include a service-role key or mock school data.
 ## Open and run
 
 1. Open the `android/` directory in Android Studio and allow Gradle sync. The
-   project includes the Gradle wrapper.
+   project includes the Gradle wrapper and pins its Gradle daemon to Java 17.
+   If Android Studio only has Java 25 selected, install a Java 17 JDK and
+   select it under **Settings > Build, Execution, Deployment > Build Tools >
+   Gradle > Gradle JDK**, then sync again.
 2. Add the public Supabase project configuration to `android/local.properties`
    (this file is ignored by Git):
 
@@ -23,11 +26,12 @@ properties. Only the public anon key belongs here; never use a service-role
 key. A signed-in session is kept in memory and is cleared when the app process
 ends or the user signs out.
 
-The login screen supports both sign-in and registration. Guru/Wali users should
-register with the email the school Admin added, provide their display name,
-and choose a password of at least 8 characters. If Supabase requires email
-confirmation, the app shows a confirmation notice and keeps sign-in available;
-after confirming, sign in with the same credentials.
+There is no self-registration in the Android app. When an Admin adds a Guru or
+Wali Kelas in the web app, AbsensiMax creates their Android account using the
+registered email and the temporary password `AbsensiMax`. On first sign-in,
+the app requires the user to set a personal password. Account settings also
+allow updating the staff name, phone number, and password; the login email is
+managed by the Admin.
 
 Guru accounts can use teacher check-in/out, teaching schedules, attendance
 rosters, and leave requests. Wali Kelas accounts can view their class, class

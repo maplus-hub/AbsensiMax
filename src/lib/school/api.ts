@@ -61,8 +61,17 @@ export function upsertStaff({
     isGuru: boolean;
     isWali: boolean;
   };
-}): Promise<{ id: string }> {
+}): Promise<{ id: string; accountCreated: boolean }> {
   return invoke("upsertStaff", data);
+}
+
+export function updateOwnAccount({
+  data,
+}: Invocation & { data: { name: string; phone?: string; password?: string } }): Promise<{
+  ok: true;
+  mustChangePassword: boolean;
+}> {
+  return invoke("updateOwnAccount", data);
 }
 
 export function setStaffActive({

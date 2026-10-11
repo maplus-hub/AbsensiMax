@@ -32,7 +32,8 @@ bukan password database maupun kunci service-role.
 ## Akun dan aplikasi Android
 
 Akun Admin pertama dibuat dari halaman web. Admin menambahkan email Guru/Wali
-di menu akun; Guru/Wali lalu mendaftar di aplikasi Android dengan email yang
-sama. Akun dari sistem login lama harus mendaftar ulang. Buka folder `android/`
-di Android Studio untuk menjalankan aplikasi Guru/Wali. Konfigurasi Supabase
+di menu akun untuk langsung membuat akun Android Guru/Wali dengan kata sandi
+sementara `AbsensiMax`. Pengguna wajib mengganti kata sandi pada login pertama;
+akun yang sudah tertaut tetap menggunakan kata sandi yang sudah ada. Buka folder
+`android/` di Android Studio untuk menjalankan aplikasinya. Konfigurasi Supabase
 lokal Android disimpan di `android/local.properties` dan tidak masuk Git.

@@ -23,6 +23,7 @@ type User = {
   id: string;
   email?: string;
   email_confirmed_at?: string;
+  app_metadata?: Record<string, unknown>;
   user_metadata?: Record<string, unknown>;
 };
 type StaffRow = {
@@ -40,6 +41,7 @@ type StaffRow = {
 };
 type Profile = {
   userId: string;
+  mustChangePassword: boolean;
   school: { id: string; name: string; address: string | null };
   staff: Record<string, unknown> & {
     id: string;
@@ -133,9 +135,8 @@ async function getProfile(db: ReturnType<typeof createClient>, user: User): Prom
     (typeof metadataName === "string" && metadataName.trim()) || email.split("@")[0] || "Pengguna";
   must(await db.from("app_users").upsert({ id: user.id, name, email }, { onConflict: "id" }));
 
-  let staff = must(
-    await db.from("staff").select("*").eq("user_id", user.id).eq("active", true).maybeSingle(),
-  );
+  let staff = must(await db.from("staff").select("*").eq("user_id", user.id).maybeSingle());
+  if (staff && !staff.active) throw new Error("Akun sekolah ini sudah dinonaktifkan.");
   if (!staff && email) {
     const invitation = must(
       await db
@@ -159,9 +160,7 @@ async function getProfile(db: ReturnType<typeof createClient>, user: User): Prom
       if (link.error) throw new DatabaseError(link.error.message);
       staff = link.data;
       if (!staff) {
-        staff = must(
-          await db.from("staff").select("*").eq("user_id", user.id).maybeSingle(),
-        );
+        staff = must(await db.from("staff").select("*").eq("user_id", user.id).maybeSingle());
         if (staff && !staff.active) throw new Error("Akun sekolah ini sudah dinonaktifkan.");
         if (!staff) throw new Error("Undangan staf sudah digunakan oleh akun lain.");
       }
@@ -247,7 +246,14 @@ async function getProfile(db: ReturnType<typeof createClient>, user: User): Prom
       };
     }
   }
-  return { userId: user.id, school, staff: mapStaff(staff as StaffRow), waliClass, roles };
+  return {
+    userId: user.id,
+    mustChangePassword: user.app_metadata?.must_change_password === true,
+    school,
+    staff: mapStaff(staff as StaffRow),
+    waliClass,
+    roles,
+  };
 }
 
 function requireAdmin(profile: Profile) {
@@ -257,6 +263,51 @@ function requireAdmin(profile: Profile) {
 function requireTeacher(profile: Profile) {
   if (!profile.staff.isGuru && !profile.staff.isWali && !profile.staff.isAdmin) {
     throw new Error("Hanya guru yang dapat melakukan ini");
+  }
+}
+
+async function provisionStaffAccount(
+  db: ReturnType<typeof createClient>,
+  schoolId: string,
+  staffId: string,
+  name: string,
+  email: string,
+): Promise<boolean> {
+  const createdUser = await db.auth.admin.createUser({
+    email,
+    password: "AbsensiMax",
+    email_confirm: true,
+    user_metadata: { name },
+    app_metadata: { must_change_password: true },
+  });
+  if (createdUser.error) {
+    if (createdUser.error.code === "email_exists") {
+      throw new Error("Email sudah memiliki akun. Gunakan email lain atau hubungi Admin.");
+    }
+    throw new Error(`Gagal membuat akun staf: ${createdUser.error.message}`);
+  }
+
+  try {
+    const link = await db
+      .from("staff")
+      .update({ user_id: createdUser.data.user.id })
+      .eq("id", staffId)
+      .eq("school_id", schoolId)
+      .is("user_id", null)
+      .select("id")
+      .maybeSingle();
+    if (link.error) throw new DatabaseError(link.error.message);
+    if (!link.data) throw new Error("Data staf berubah saat akun sedang dibuat. Coba lagi.");
+    return true;
+  } catch (error) {
+    const cleanup = await db.auth.admin.deleteUser(createdUser.data.user.id);
+    if (cleanup.error) {
+      console.error(
+        "[school-api:upsertStaff] failed to remove orphan auth user:",
+        cleanup.error.message,
+      );
+    }
+    throw error;
   }
 }
 
@@ -418,6 +469,9 @@ async function dispatch(
 ) {
   const schoolId = p.school.id;
   const staffId = p.staff.id as string;
+  if (p.mustChangePassword && action !== "bootstrapSession" && action !== "updateOwnAccount") {
+    throw new Error("Ubah kata sandi sementara melalui Pengaturan akun terlebih dahulu.");
+  }
   switch (action) {
     case "bootstrapSession":
       return p;
@@ -450,6 +504,17 @@ async function dispatch(
         is_wali: Boolean(data.isWali),
       };
       if (data.id) {
+        const current = must(
+          await db
+            .from("staff")
+            .select("user_id,email")
+            .eq("id", data.id)
+            .eq("school_id", schoolId)
+            .single(),
+        );
+        if (current.user_id && current.email?.trim().toLowerCase() !== email) {
+          throw new Error("Email akun yang sudah dibuat tidak dapat diubah dari panel staf.");
+        }
         must(
           await db
             .from("staff")
@@ -459,7 +524,11 @@ async function dispatch(
             .select("id")
             .single(),
         );
-        return { id: data.id };
+        const accountCreated =
+          !current.user_id && !row.is_admin && (row.is_guru || row.is_wali)
+            ? await provisionStaffAccount(db, schoolId, data.id, name, email)
+            : false;
+        return { id: data.id, accountCreated };
       }
       const created = must(
         await db
@@ -468,7 +537,94 @@ async function dispatch(
           .select("id")
           .single(),
       );
-      return { id: created.id };
+      try {
+        const accountCreated =
+          !row.is_admin && (row.is_guru || row.is_wali)
+            ? await provisionStaffAccount(db, schoolId, created.id, name, email)
+            : false;
+        return { id: created.id, accountCreated };
+      } catch (error) {
+        const rollback = await db
+          .from("staff")
+          .delete()
+          .eq("id", created.id)
+          .eq("school_id", schoolId);
+        if (rollback.error) {
+          console.error(
+            "[school-api:upsertStaff] failed to remove staff record:",
+            rollback.error.message,
+          );
+        }
+        throw error;
+      }
+    }
+    case "updateOwnAccount": {
+      if ((!p.staff.isGuru && !p.staff.isWali) || p.staff.isAdmin) {
+        throw new Error("Pengaturan akun ini hanya tersedia untuk Guru dan Wali Kelas.");
+      }
+      const name = String(data.name ?? "").trim();
+      const phone = String(data.phone ?? "").trim() || null;
+      const password = String(data.password ?? "");
+      if (!name) throw new Error("Nama wajib diisi.");
+      if (name.length > 120) throw new Error("Nama maksimal 120 karakter.");
+      if (phone && phone.length > 40) throw new Error("Nomor telepon maksimal 40 karakter.");
+      if (p.mustChangePassword && !password) {
+        throw new Error("Buat kata sandi baru sebelum melanjutkan.");
+      }
+      if (password && password.length < 8) {
+        throw new Error("Kata sandi baru minimal 8 karakter.");
+      }
+
+      const account = await db.auth.admin.getUserById(p.userId);
+      if (account.error) throw new Error(`Gagal memperbarui akun: ${account.error.message}`);
+      const currentStaff = must(
+        await db
+          .from("staff")
+          .select("name,phone")
+          .eq("id", staffId)
+          .eq("school_id", schoolId)
+          .eq("user_id", p.userId)
+          .single(),
+      );
+      must(
+        await db
+          .from("staff")
+          .update({ name, phone })
+          .eq("id", staffId)
+          .eq("school_id", schoolId)
+          .eq("user_id", p.userId)
+          .select("id")
+          .single(),
+      );
+      const metadata = {
+        ...(account.data.user.user_metadata ?? {}),
+        name,
+      };
+      const appMetadata = {
+        ...(account.data.user.app_metadata ?? {}),
+        ...(password ? { must_change_password: false } : {}),
+      };
+      const authUpdate = await db.auth.admin.updateUserById(p.userId, {
+        user_metadata: metadata,
+        app_metadata: appMetadata,
+        ...(password ? { password } : {}),
+      });
+      if (authUpdate.error) {
+        const rollback = await db
+          .from("staff")
+          .update({ name: currentStaff.name, phone: currentStaff.phone })
+          .eq("id", staffId)
+          .eq("school_id", schoolId)
+          .eq("user_id", p.userId);
+        if (rollback.error) {
+          console.error(
+            "[school-api:updateOwnAccount] failed to roll back staff profile:",
+            rollback.error.message,
+          );
+        }
+        throw new Error(`Gagal memperbarui akun: ${authUpdate.error.message}`);
+      }
+      return { ok: true, mustChangePassword: Boolean(p.mustChangePassword && !password) };
     }
     case "setStaffActive": {
       requireAdmin(p);
@@ -608,7 +764,10 @@ async function dispatch(
       const rows = must(await query.order("name")) as Record<string, unknown>[];
       const classIds = [...new Set(rows.map((r) => r.class_id as string))];
       const classes = classIds.length
-        ? (must(await db.from("classes").select("id,name").in("id", classIds)) as { id: string; name: string }[])
+        ? (must(await db.from("classes").select("id,name").in("id", classIds)) as {
+            id: string;
+            name: string;
+          }[])
         : [];
       const classNames = new Map(classes.map((c) => [c.id, c.name]));
       return rows.map((r) => ({
@@ -759,16 +918,14 @@ async function dispatch(
         );
       else
         must(
-          await db
-            .from("teacher_attendance")
-            .insert({
-              id: id("tat"),
-              school_id: schoolId,
-              staff_id: staffId,
-              date: today,
-              check_in_at: new Date().toISOString(),
-              status: "hadir",
-            }),
+          await db.from("teacher_attendance").insert({
+            id: id("tat"),
+            school_id: schoolId,
+            staff_id: staffId,
+            date: today,
+            check_in_at: new Date().toISOString(),
+            status: "hadir",
+          }),
         );
       return { ok: true };
     }

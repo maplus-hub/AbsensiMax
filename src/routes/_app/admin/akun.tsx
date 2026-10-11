@@ -21,11 +21,7 @@ function Page() {
 }
 
 function rolesText(s: Staff) {
-  return [
-    s.isAdmin ? "Admin" : null,
-    s.isGuru ? "Guru" : null,
-    s.isWali ? "Wali kelas" : null,
-  ]
+  return [s.isAdmin ? "Admin" : null, s.isGuru ? "Guru" : null, s.isWali ? "Wali kelas" : null]
     .filter(Boolean)
     .join(" · ");
 }
@@ -34,9 +30,14 @@ function AkunPage() {
   const [rows, setRows] = useState<Staff[] | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
+  const [createdAccount, setCreatedAccount] = useState<{ name: string; email: string } | null>(
+    null,
+  );
 
   const load = () => {
-    void listStaff().then(setRows).catch(() => setRows([]));
+    void listStaff()
+      .then(setRows)
+      .catch(() => setRows([]));
   };
   useEffect(load, []);
 
@@ -45,7 +46,7 @@ function AkunPage() {
       <PageHeader
         kicker="Pengaturan"
         title="Akun guru & wali kelas"
-        desc="Daftarkan staf dengan email. Setelah mereka masuk memakai email yang sama, akun otomatis tertaut."
+        desc="Tambahkan staf untuk langsung membuat akun Guru atau Wali Kelas di aplikasi Android."
         actions={
           <Button
             onClick={() => {
@@ -57,9 +58,21 @@ function AkunPage() {
           </Button>
         }
       />
+      {createdAccount && (
+        <Card className="mb-4 border border-primary/20 bg-surface-2">
+          <p className="font-medium">Akun Android untuk {createdAccount.name} siap digunakan.</p>
+          <p className="mt-1 text-sm text-muted">
+            Email: {createdAccount.email} · Kata sandi awal: <strong>AbsensiMax</strong>. Minta staf
+            menggantinya saat pertama masuk.
+          </p>
+        </Card>
+      )}
       <div className="space-y-2">
         {(rows ?? []).map((s) => (
-          <Card key={s.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Card
+            key={s.id}
+            className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          >
             <div>
               <p className="font-medium">{s.name}</p>
               <p className="text-sm text-muted">{s.email}</p>
@@ -103,8 +116,9 @@ function AkunPage() {
         open={open}
         onOpenChange={setOpen}
         staff={editing}
-        onSaved={() => {
+        onSaved={(account) => {
           setOpen(false);
+          if (account) setCreatedAccount(account);
           load();
         }}
       />
@@ -121,7 +135,7 @@ function StaffDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   staff: Staff | null;
-  onSaved: () => void;
+  onSaved: (account?: { name: string; email: string }) => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -143,11 +157,15 @@ function StaffDialog({
   const save = async () => {
     setBusy(true);
     try {
-      await upsertStaff({
+      const result = await upsertStaff({
         data: { id: staff?.id, name, email, nip, isAdmin, isGuru, isWali },
       });
-      toast.success("Staf disimpan");
-      onSaved();
+      toast.success(
+        result.accountCreated
+          ? "Akun dibuat. Kata sandi awal: AbsensiMax. Staf akan diminta menggantinya saat masuk."
+          : "Staf disimpan",
+      );
+      onSaved(result.accountCreated ? { name, email } : undefined);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal menyimpan");
     } finally {
@@ -163,22 +181,55 @@ function StaffDialog({
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Email">
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={Boolean(staff?.userId)}
+            />
           </Field>
+          {staff?.userId && (
+            <p className="text-xs text-muted">
+              Email akun yang sudah terhubung tidak dapat diubah di sini.
+            </p>
+          )}
+          {!staff && !isAdmin && (isGuru || isWali) && (
+            <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
+              Akun Android dibuat langsung. Kata sandi awal <strong>AbsensiMax</strong> dan wajib
+              diganti saat pertama masuk.
+            </p>
+          )}
+          {!staff && isAdmin && (isGuru || isWali) && (
+            <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">
+              Staf dengan peran Admin hanya menggunakan aplikasi web. Akun Android tidak dibuat.
+            </p>
+          )}
           <Field label="NIP">
             <Input value={nip} onChange={(e) => setNip(e.target.value)} />
           </Field>
           <div className="flex flex-wrap gap-3 pt-1 text-sm">
             <label className="flex h-11 items-center gap-2">
-              <input type="checkbox" checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={isAdmin}
+                onChange={(e) => setIsAdmin(e.target.checked)}
+              />
               Admin
             </label>
             <label className="flex h-11 items-center gap-2">
-              <input type="checkbox" checked={isGuru} onChange={(e) => setIsGuru(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={isGuru}
+                onChange={(e) => setIsGuru(e.target.checked)}
+              />
               Guru
             </label>
             <label className="flex h-11 items-center gap-2">
-              <input type="checkbox" checked={isWali} onChange={(e) => setIsWali(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={isWali}
+                onChange={(e) => setIsWali(e.target.checked)}
+              />
               Wali kelas
             </label>
           </div>

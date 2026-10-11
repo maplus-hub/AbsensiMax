@@ -16,10 +16,6 @@ data class UserSession(
     val expiresAtMillis: Long,
 )
 
-data class SignUpResult(
-    val session: UserSession?,
-)
-
 class SchoolApi(
     private val projectUrl: String,
     private val anonKey: String,
@@ -40,29 +36,6 @@ class SchoolApi(
         val json = response as? JSONObject ?: error("Respons autentikasi tidak valid")
         createSession(json).also { session = it }
     }
-
-    suspend fun signUp(email: String, password: String, displayName: String): SignUpResult =
-        withContext(Dispatchers.IO) {
-            requireConfigured()
-            require(password.length >= 8) { "Kata sandi harus terdiri dari minimal 8 karakter." }
-            require(displayName.isNotBlank()) { "Nama wajib diisi." }
-            val body = JSONObject()
-                .put("email", email.trim())
-                .put("password", password)
-                .put("data", JSONObject().put("name", displayName.trim()))
-            val response = request(
-                path = "/auth/v1/signup",
-                body = body,
-            ) as? JSONObject ?: error("Respons pendaftaran tidak valid")
-            val access = response.optString("access_token")
-            val refresh = response.optString("refresh_token")
-            if (access.isBlank() || refresh.isBlank()) {
-                session = null
-                SignUpResult(session = null)
-            } else {
-                SignUpResult(createSession(response).also { session = it })
-            }
-        }
 
     suspend fun invoke(action: String, data: JSONObject = JSONObject()): Any? =
         withContext(Dispatchers.IO) {

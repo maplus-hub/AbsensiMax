@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,11 +12,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -30,6 +34,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -53,6 +65,7 @@ private enum class AppTab(val title: String) {
     CLASS("Kelas"),
     RECAP("Rekap"),
     LEAVE("Izin"),
+    ACCOUNT("Akun"),
 }
 
 private val attendanceStatuses = listOf("hadir", "sakit", "izin", "alpha", "cuti")
@@ -63,11 +76,25 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(
                 colorScheme = lightColorScheme(
-                    primary = androidx.compose.ui.graphics.Color(0xFF176B58),
-                    secondary = androidx.compose.ui.graphics.Color(0xFF4C7569),
-                    background = androidx.compose.ui.graphics.Color(0xFFF5F7F5),
-                    surface = androidx.compose.ui.graphics.Color.White,
-                    error = androidx.compose.ui.graphics.Color(0xFFB3261E),
+                    primary = Color(0xFF145C4C),
+                    onPrimary = Color(0xFFF6F1E6),
+                    primaryContainer = Color(0xFFD8E7DD),
+                    onPrimaryContainer = Color(0xFF173D33),
+                    secondary = Color(0xFF4C7569),
+                    background = Color(0xFFF3EEE4),
+                    onBackground = Color(0xFF1A221C),
+                    surface = Color(0xFFFBF8F1),
+                    onSurface = Color(0xFF1A221C),
+                    surfaceVariant = Color(0xFFEFE6D6),
+                    onSurfaceVariant = Color(0xFF6D6558),
+                    outline = Color(0xFFDDD4C4),
+                    error = Color(0xFF9B2C35),
+                ),
+                shapes = Shapes(
+                    small = RoundedCornerShape(10.dp),
+                    medium = RoundedCornerShape(18.dp),
+                    large = RoundedCornerShape(24.dp),
+                    extraLarge = RoundedCornerShape(28.dp),
                 ),
             ) {
                 AbsensiMaxApp()
@@ -108,8 +135,6 @@ private fun AbsensiMaxApp() {
     var busy by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
     var notice by remember { mutableStateOf("") }
-    var registrationMode by remember { mutableStateOf(false) }
-    var confirmationEmail by remember { mutableStateOf("") }
 
     fun perform(block: suspend () -> Unit) {
         scope.launch {
@@ -201,9 +226,17 @@ private fun AbsensiMaxApp() {
             return
         }
         profile = loadedProfile
-        dashboard = api.invoke("getDashboard") as? JSONObject
-        activeTab = AppTab.HOME
-        confirmationEmail = ""
+        val mustChangePassword = loadedProfile.optBoolean("mustChangePassword")
+        dashboard = if (mustChangePassword) {
+            null
+        } else {
+            api.invoke("getDashboard") as? JSONObject
+        }
+        activeTab = if (mustChangePassword) {
+            AppTab.ACCOUNT
+        } else {
+            AppTab.HOME
+        }
     }
 
     LaunchedEffect(activeTab, profile?.optString("userId")) {
@@ -217,6 +250,7 @@ private fun AbsensiMaxApp() {
                             .distinctBy { it.optString("subjectId") }
                     }
                     AppTab.HOME -> Unit
+                    AppTab.ACCOUNT -> Unit
                 }
             }
         }
@@ -228,24 +262,10 @@ private fun AbsensiMaxApp() {
             busy = busy,
             error = errorMessage,
             configured = api.isConfigured,
-            registrationMode = registrationMode,
-            confirmationEmail = confirmationEmail,
-            onRegistrationModeChange = { registrationMode = it },
             onLogin = { email, password ->
                 perform {
                     api.signIn(email, password)
                     completeAuthentication()
-                }
-            },
-            onSignUp = { displayName, email, password ->
-                perform {
-                    val result = api.signUp(email, password, displayName)
-                    if (result.session == null) {
-                        confirmationEmail = email.trim()
-                        registrationMode = false
-                    } else {
-                        completeAuthentication()
-                    }
                 }
             },
         )
@@ -260,18 +280,27 @@ private fun AbsensiMaxApp() {
         add(AppTab.CLASS)
         if (isWali) add(AppTab.RECAP)
         add(AppTab.LEAVE)
+        add(AppTab.ACCOUNT)
     }
+    val mustChangePassword = currentProfile.optBoolean("mustChangePassword")
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("AbsensiMax", fontWeight = FontWeight.Bold)
-                        Text(
-                            currentProfile.optJSONObject("staff")?.optString("name").orEmpty(),
-                            style = MaterialTheme.typography.labelMedium,
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        AbsensiLogo(Modifier.size(38.dp))
+                        Column {
+                            Text("AbsensiMax", fontWeight = FontWeight.Bold)
+                            Text(
+                                currentProfile.optJSONObject("staff")?.optString("name").orEmpty(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -295,7 +324,26 @@ private fun AbsensiMaxApp() {
                     NavigationBarItem(
                         selected = activeTab == tab,
                         onClick = { activeTab = tab },
-                        icon = { Text(tab.title.take(1)) },
+                        enabled = !mustChangePassword || tab == AppTab.ACCOUNT,
+                        icon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .background(
+                                        if (activeTab == tab) MaterialTheme.colorScheme.primaryContainer
+                                        else Color.Transparent,
+                                        CircleShape,
+                                    )
+                                    .clip(CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    tab.title.take(1),
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                        },
                         label = { Text(tab.title) },
                     )
                 }
@@ -428,6 +476,32 @@ private fun AbsensiMaxApp() {
                         }
                     },
                 )
+                AppTab.ACCOUNT -> AccountScreen(
+                    profile = currentProfile,
+                    busy = busy,
+                    mustChangePassword = mustChangePassword,
+                    onSave = { name, phone, password, onSaved ->
+                        perform {
+                            val data = JSONObject()
+                                .put("name", name)
+                                .put("phone", phone)
+                            if (password.isNotBlank()) data.put("password", password)
+                            api.invoke("updateOwnAccount", data)
+                            val refreshedProfile = api.invoke("bootstrapSession") as? JSONObject
+                                ?: kotlin.error("Profil akun tidak valid")
+                            profile = refreshedProfile
+                            if (!refreshedProfile.optBoolean("mustChangePassword")) {
+                                activeTab = AppTab.HOME
+                            }
+                            notice = if (password.isNotBlank()) {
+                                "Data akun dan kata sandi berhasil diperbarui."
+                            } else {
+                                "Data akun berhasil diperbarui."
+                            }
+                            onSaved()
+                        }
+                    },
+                )
             }
         }
     }
@@ -438,13 +512,8 @@ private fun LoginScreen(
     busy: Boolean,
     error: String,
     configured: Boolean,
-    registrationMode: Boolean,
-    confirmationEmail: String,
-    onRegistrationModeChange: (Boolean) -> Unit,
     onLogin: (String, String) -> Unit,
-    onSignUp: (String, String, String) -> Unit,
 ) {
-    var displayName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -452,98 +521,231 @@ private fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 48.dp),
+                .padding(horizontal = 24.dp, vertical = 36.dp),
             verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("AbsensiMax", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (registrationMode) "Daftarkan akun dengan email yang sudah ditambahkan Admin."
-                else "Masuk untuk mengelola kegiatan sekolah.",
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Spacer(Modifier.height(24.dp))
-            if (!configured) {
-                MessageCard(
-                    "Konfigurasi Supabase belum tersedia. Tambahkan URL project dan anon key publik pada android/local.properties.",
-                    isError = true,
-                )
-            }
-            if (error.isNotBlank()) MessageCard(error, isError = true)
-            if (confirmationEmail.isNotBlank()) {
-                MessageCard(
-                    "Pendaftaran berhasil. Buka tautan konfirmasi yang dikirim ke $confirmationEmail, lalu masuk dengan email dan kata sandi Anda.",
-                    isError = false,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = !registrationMode,
-                    onClick = { onRegistrationModeChange(false) },
-                    enabled = !busy,
-                    label = { Text("Masuk") },
-                )
-                FilterChip(
-                    selected = registrationMode,
-                    onClick = { onRegistrationModeChange(true) },
-                    enabled = !busy,
-                    label = { Text("Daftar") },
-                )
-            }
-            if (registrationMode) {
-                OutlinedTextField(
-                    value = displayName,
-                    onValueChange = { displayName = it },
-                    label = { Text("Nama lengkap") },
-                    singleLine = true,
-                    enabled = !busy,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(12.dp))
-            }
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email") },
-                singleLine = true,
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Kata sandi") },
-                supportingText = if (registrationMode) {
-                    { Text("Minimal 8 karakter") }
-                } else {
-                    null
-                },
-                singleLine = true,
-                enabled = !busy,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(20.dp))
-            Button(
-                onClick = {
-                    if (registrationMode) onSignUp(displayName, email, password)
-                    else onLogin(email, password)
-                },
-                enabled = !busy && configured && email.isNotBlank() &&
-                    if (registrationMode) displayName.isNotBlank() && password.length >= 8
-                    else password.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 480.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (busy) CircularProgressIndicator(Modifier.width(20.dp), strokeWidth = 2.dp)
-                else Text(if (registrationMode) "Daftar" else "Masuk")
+                AbsensiLogo(Modifier.size(68.dp))
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "AbsensiMax",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    "Kehadiran sekolah, lebih tertata.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(28.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        Text(
+                            "Selamat datang",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "Masuk dengan akun Guru atau Wali Kelas yang dibuat oleh Admin.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (!configured) {
+                            MessageCard(
+                                "Konfigurasi Supabase belum tersedia. Lengkapi pengaturan aplikasi terlebih dahulu.",
+                                isError = true,
+                            )
+                        }
+                        if (error.isNotBlank()) MessageCard(error, isError = true)
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = { Text("Email") },
+                            singleLine = true,
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Kata sandi") },
+                            singleLine = true,
+                            enabled = !busy,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Button(
+                            onClick = { onLogin(email.trim(), password) },
+                            enabled = !busy && configured && email.isNotBlank() && password.isNotBlank(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp),
+                        ) {
+                            if (busy) {
+                                CircularProgressIndicator(
+                                    Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            } else {
+                                Text("Masuk", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    "Belum memiliki akses? Hubungi Admin sekolah.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "Akun Admin dikelola melalui client web.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        }
+    }
+}
+
+@Composable
+private fun AbsensiLogo(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(R.drawable.ic_launcher),
+        contentDescription = "Logo AbsensiMax",
+        modifier = modifier.clip(CircleShape),
+    )
+}
+
+@Composable
+private fun AccountScreen(
+    profile: JSONObject,
+    busy: Boolean,
+    mustChangePassword: Boolean,
+    onSave: (String, String, String, () -> Unit) -> Unit,
+) {
+    val staff = profile.optJSONObject("staff")
+    var name by remember(profile.optString("userId")) {
+        mutableStateOf(staff?.optString("name").orEmpty())
+    }
+    var phone by remember(profile.optString("userId")) {
+        mutableStateOf(staff?.optString("phone").orEmpty().takeUnless { it == "null" }.orEmpty())
+    }
+    var password by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    val passwordValid = password.isBlank() && confirmation.isBlank() ||
+        (password.length >= 8 && password == confirmation)
+
+    ContentColumn {
+        SectionTitle("Pengaturan akun")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                AbsensiLogo(Modifier.size(52.dp))
+                Column {
+                    Text(name.ifBlank { "Akun staf" }, fontWeight = FontWeight.Bold)
+                    Text(
+                        profile.optJSONArray("roles").strings().joinToString(" · ") { it.roleTitle() },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (mustChangePassword) {
+            MessageCard(
+                "Kata sandi awal Anda adalah AbsensiMax. Demi keamanan, buat kata sandi pribadi sebelum menggunakan aplikasi.",
+                isError = false,
             )
+        }
+        SectionTitle("Data profil")
+        InfoCard(
+            "Email masuk",
+            staff?.optString("email").orEmpty().ifBlank { "Email tidak tersedia" },
+        )
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Nama lengkap") },
+            singleLine = true,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = phone,
+            onValueChange = { phone = it },
+            label = { Text("Nomor telepon") },
+            singleLine = true,
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        SectionTitle("Ganti kata sandi")
+        Text(
+            "Kosongkan jika tidak ingin mengganti kata sandi.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Kata sandi baru") },
+            supportingText = { Text("Minimal 8 karakter") },
+            singleLine = true,
+            enabled = !busy,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = confirmation,
+            onValueChange = { confirmation = it },
+            label = { Text("Ulangi kata sandi baru") },
+            singleLine = true,
+            enabled = !busy,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (!passwordValid) {
+            Text(
+                "Kata sandi minimal 8 karakter dan harus sama pada kedua kolom.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Button(
+            onClick = {
+                onSave(name.trim(), phone.trim(), password) {
+                    password = ""
+                    confirmation = ""
+                }
+            },
+            enabled = !busy && name.isNotBlank() && passwordValid &&
+                (!mustChangePassword || password.length >= 8),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+        ) {
+            Text("Simpan perubahan", fontWeight = FontWeight.SemiBold)
         }
     }
 }
