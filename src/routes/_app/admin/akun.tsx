@@ -30,9 +30,11 @@ function AkunPage() {
   const [rows, setRows] = useState<Staff[] | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
-  const [createdAccount, setCreatedAccount] = useState<{ name: string; email: string } | null>(
-    null,
-  );
+  const [accountNotice, setAccountNotice] = useState<{
+    name: string;
+    email: string;
+    created: boolean;
+  } | null>(null);
 
   const load = () => {
     void listStaff()
@@ -58,13 +60,31 @@ function AkunPage() {
           </Button>
         }
       />
-      {createdAccount && (
-        <Card className="mb-4 border border-primary/20 bg-surface-2">
-          <p className="font-medium">Akun Android untuk {createdAccount.name} siap digunakan.</p>
-          <p className="mt-1 text-sm text-muted">
-            Email: {createdAccount.email} · Kata sandi awal: <strong>AbsensiMax</strong>. Minta staf
-            menggantinya saat pertama masuk.
-          </p>
+      {accountNotice && (
+        <Card
+          className={`mb-4 border ${
+            accountNotice.created ? "border-primary/20 bg-surface-2" : "border-alpha/30 bg-alpha/5"
+          }`}
+        >
+          {accountNotice.created ? (
+            <>
+              <p className="font-medium">Akun Android untuk {accountNotice.name} siap digunakan.</p>
+              <p className="mt-1 text-sm text-muted">
+                Email: {accountNotice.email} · Kata sandi awal: <strong>AbsensiMax</strong>. Minta
+                staf menggantinya saat pertama masuk.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium">
+                Data staf {accountNotice.name} tersimpan, tetapi akun Android belum dibuat.
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Perbarui backend Supabase terlebih dahulu. Setelah itu, pilih Ubah staf ini lalu
+                Simpan untuk membuat akunnya.
+              </p>
+            </>
+          )}
         </Card>
       )}
       <div className="space-y-2">
@@ -116,9 +136,11 @@ function AkunPage() {
         open={open}
         onOpenChange={setOpen}
         staff={editing}
-        onSaved={(account) => {
+        onSaved={(status, account) => {
           setOpen(false);
-          if (account) setCreatedAccount(account);
+          setAccountNotice(
+            status === "saved" ? null : { ...account, created: status === "created" },
+          );
           load();
         }}
       />
@@ -135,7 +157,10 @@ function StaffDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   staff: Staff | null;
-  onSaved: (account?: { name: string; email: string }) => void;
+  onSaved: (
+    status: "created" | "pending" | "saved",
+    account: { name: string; email: string },
+  ) => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -160,12 +185,18 @@ function StaffDialog({
       const result = await upsertStaff({
         data: { id: staff?.id, name, email, nip, isAdmin, isGuru, isWali },
       });
-      toast.success(
-        result.accountCreated
-          ? "Akun dibuat. Kata sandi awal: AbsensiMax. Staf akan diminta menggantinya saat masuk."
-          : "Staf disimpan",
-      );
-      onSaved(result.accountCreated ? { name, email } : undefined);
+      const accountExpected = !staff?.userId && !isAdmin && (isGuru || isWali);
+      const status = result.accountCreated ? "created" : accountExpected ? "pending" : "saved";
+      if (status === "created") {
+        toast.success(
+          "Akun dibuat. Kata sandi awal: AbsensiMax. Staf akan diminta menggantinya saat masuk.",
+        );
+      } else if (status === "pending") {
+        toast.error("Data staf disimpan, tetapi akun Android belum dibuat oleh backend.");
+      } else {
+        toast.success("Staf disimpan");
+      }
+      onSaved(status, { name, email });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal menyimpan");
     } finally {
